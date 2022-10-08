@@ -10,11 +10,11 @@ from sklearn.model_selection import KFold
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
 from file_utils import read_data
+from SDT import SDT as Model
 
 
 def create_vocab(m2_dir, data_dir, source_name, target_name):
@@ -214,22 +214,6 @@ class M2Dataset(Dataset):
         return feature, label
 
 
-class Model(nn.Module):
-    """
-    A very simple linear model
-    """
-
-    def __init__(self, feature_length):
-        super().__init__()
-        self.linear = nn.Linear(feature_length, 1)
-
-    def forward(self, x):
-        x = self.linear(x)
-        x = F.sigmoid(x)
-
-        return x
-
-
 def train(model, train_dataset, batch_size, lr, weight_decay, num_epoch, device,
           model_path=None, eval_dataset=None, save_last=False, verbose=False):
     """
@@ -257,9 +241,9 @@ def train(model, train_dataset, batch_size, lr, weight_decay, num_epoch, device,
             optimizer.zero_grad()
 
             # do forward propagation
-            outputs = model(features)
+            outputs, penalty = model(features, is_training_data=True)
             outputs = outputs.squeeze(-1)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, labels) + penalty
 
             # do backward propagation
             loss.backward()
@@ -485,7 +469,7 @@ def main(args):
                                   upsample=args.upsample,
                                   )
         feature_size = train_dataset.feature_size()
-        model = Model(feature_size).to(device)
+        model = Model(feature_size, 1).to(device)
         eval_dataset = M2Dataset(args.m2_dir,
                                  args.data_dir,
                                  args.source_name,
@@ -508,7 +492,7 @@ def main(args):
                                   upsample=args.upsample,
                                   )
         feature_size = train_dataset.feature_size()
-        model = Model(feature_size).to(device)
+        model = Model(feature_size, 1).to(device)
         train(model, train_dataset, _BATCH_SIZE, _LR, args.weight_decay, best_epoch,
               device, model_path, save_last=True)
         print('Finished training.')
@@ -523,7 +507,7 @@ def main(args):
                                  test=True,
                                  )
         feature_size = test_dataset.feature_size()
-        model = Model(feature_size).to(device)
+        model = Model(feature_size, 1).to(device)
         sentences = test(model, args.model_path, test_dataset,
                          device, threshold=args.threshold)
         with open(args.output_path, 'w', encoding='utf-8') as out:
