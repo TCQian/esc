@@ -219,12 +219,18 @@ class Model(nn.Module):
     A very simple linear model
     """
 
-    def __init__(self, feature_length):
+    def __init__(self, feature_length, dropout=0.3):
         super().__init__()
-        self.linear = nn.Linear(feature_length, 1)
+        self.linear1 = nn.Linear(feature_length, int(feature_length / 3))
+        self.activation = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(int(feature_length / 3), 1)
 
     def forward(self, x):
-        x = self.linear(x)
+        x = self.linear1(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+        x = self.linear2(x)
         x = F.sigmoid(x)
 
         return x
